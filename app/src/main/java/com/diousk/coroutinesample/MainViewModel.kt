@@ -1,6 +1,8 @@
 package com.diousk.coroutinesample
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asLiveData
+import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
@@ -23,7 +25,7 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun customScopeWithNormalJob() {
+    fun customScopeWithNormalJobLaunch() {
         val exceptionHandler = CoroutineExceptionHandler { _, _ -> }
         val job = Job()
         val scope = CoroutineScope(Dispatchers.Default + job + exceptionHandler)
@@ -34,14 +36,42 @@ class MainViewModel : ViewModel() {
             Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
         }
 
-        scope.launch {
+        scope.launch(CoroutineExceptionHandler { coroutineContext, throwable ->
+            Timber.d("child coroutine 2 handle error")
+        }) {
             Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
             delay(200)
             Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
             try {
+                // throw in scope layer
                 throw Throwable("child 2 throw") // propagate error to its parent
             } catch (e: Exception) {
                 // this log will not be printed
+                Timber.d("child 2 catch")
+            }
+        }
+    }
+
+    fun customScopeSupervisorJobLaunch() {
+        val job = SupervisorJob()
+        val scope = CoroutineScope(Dispatchers.Default + job)
+        scope.launch {
+            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
+            delay(400)
+            // this log will be printed
+            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
+        }
+
+        scope.launch(CoroutineExceptionHandler { _, throwable ->
+            Timber.d("child coroutine 2 handle error")
+        }) {
+            Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
+            delay(200)
+            Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
+            try {
+                // throw in scope layer
+                throw Throwable("child 2 throw") // propagate error to its parent
+            } catch (e: Exception) {
                 Timber.d("child 2 catch")
             }
         }
@@ -71,46 +101,50 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun nestedCoroutine() {
+        val job = viewModelScope.launch {
+            Timber.d("child 1 start")
+            launch {
+                Timber.d("nested 1 start")
+                delay(400)
+                // this log will not be printed
+                Timber.d("nested 1 end")
+            }
+        }
+        viewModelScope.launch {
+            Timber.d("child 2 start")
+            delay(500)
+            Timber.d("child 2 end")
+        }
+
+        viewModelScope.launch {
+            Timber.d("child 3 start")
+            delay(100)
+            Timber.d("child 3 end")
+            job.cancel()
+        }
+    }
+
     fun scopedErrorAsyncCoroutine() {
+        suspend fun childCoroutineScope() = coroutineScope {
+            val result2 = async { delay(100); error("an error"); return@async 2 }
+            // throw at scope layer
+            result2.await()
+        }
+
         GlobalScope.launch(Dispatchers.Default) {
             Timber.d("start async")
             val result1 = async { delay(400); return@async 1 }
 
+            // catch the scope error
             val valueForResult2 = try {
-                coroutineScope {
-                    val result2 = async { delay(100); error("an error"); return@async 2 }
-                    result2.await()
-                }
+                childCoroutineScope()
             } catch (e: Exception) {
                 // fine to catch here
                 100
             }
 
             Timber.d("sum of result = ${result1.await() + valueForResult2}")
-        }
-    }
-
-    fun customScopeSupervisorJob() {
-        val job = SupervisorJob()
-        val scope = CoroutineScope(Dispatchers.Default + job)
-        scope.launch {
-            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
-            delay(400)
-            // this log will be printed
-            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
-        }
-
-        scope.launch(CoroutineExceptionHandler { _, throwable ->
-            Timber.d("child 2 parent handle $throwable")
-        }) {
-            Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
-            delay(200)
-            Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
-            try {
-                throw Throwable("child 2 throw") // propagate error to its parent
-            } catch (e: Exception) {
-                Timber.d("child 2 catch")
-            }
         }
     }
 
@@ -121,6 +155,7 @@ class MainViewModel : ViewModel() {
             try {
                 result.await()
             } catch (e: Exception) {
+                // fine to catch
                 Timber.d("child catch $e")
             }
         }
@@ -131,12 +166,14 @@ class MainViewModel : ViewModel() {
 
     fun supervisorScopeLaunchError() {
         suspend fun childSupervisor() = supervisorScope {
-            val result = async { delay(400); Timber.d("child done"); 1 }
-
-            val handler = CoroutineExceptionHandler { _, exception ->
-                println("Caught $exception")
+            val result = async {
+                delay(400); Timber.d("child done"); 1
             }
-            launch(handler) { // handle error here because child's failure is not propagated to the parent
+
+            launch(CoroutineExceptionHandler { _, exception ->
+                // handle error here because this child's failure is not propagated to the parent
+                println("Caught $exception")
+            }) {
                 delay(100)
                 error("an error")
             }
@@ -145,6 +182,22 @@ class MainViewModel : ViewModel() {
         }
         viewModelScope.launch {
             childSupervisor()
+        }
+    }
+
+    fun supervisorScopeScopeError() {
+        suspend fun childSupervisor(): Unit = supervisorScope {
+            launch {
+                delay(100)
+            }
+            error("scope error")
+        }
+        viewModelScope.launch {
+            try {
+                childSupervisor()
+            } catch (e: Exception) {
+                println("Caught $e")
+            }
         }
     }
 
@@ -214,6 +267,16 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun liveDataBuilder() {
+        suspend fun  fetchData(): String = withContext(Dispatchers.Default) {""}
+
+        val liveData = liveData {
+            emit(fetchData())
+        }
+    }
+
+    // --- Channel ---
+
     fun simpleChannel() {
         val channel = Channel<Int>()
         viewModelScope.launch {
@@ -233,6 +296,33 @@ class MainViewModel : ViewModel() {
                 }
                 Timber.d("done recv on ${Thread.currentThread().name}")
             }
+        }
+    }
+
+    fun channelBuilder() {
+        viewModelScope.launch {
+            val channel = produce {
+                (1..10).forEach {
+                    delay(100)
+                    Timber.d("send : $it")
+                    send(it)
+                }
+            }
+            // if we don't call consumeEach, the produce is still active
+            channel.consumeEach {
+                Timber.d("recv : $it")
+            }
+        }
+    }
+
+    @Deprecated("the actor will be removed in the future")
+    fun simpleActor() {
+        viewModelScope.launch {
+            val actorChannel = actor<Int> {
+                consumeEach { Timber.d("recv: $it") }
+            }
+
+            (1..10).forEach { actorChannel.send(it) }
         }
     }
 
@@ -260,11 +350,23 @@ class MainViewModel : ViewModel() {
         }
     }
 
+
     fun broadcastChannel() {
 
     }
 
-    fun channelFlow() {
+    // --- Flow ---
+
+    fun simpleFlow() {
+        val intFlow = flow {
+            (1..10).forEach { emit(it) }
+        }
+        intFlow
+            .onEach { Timber.d("recv: $it") }
+            .launchIn(viewModelScope)
+    }
+
+    fun callbackFlow() {
 
     }
 }
