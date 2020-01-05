@@ -12,10 +12,10 @@ import timber.log.Timber
 suspend fun <T> retry(
     times: Int = Int.MAX_VALUE,
     initialDelay: Long = 1000, // 1 second
-    maxDelay: Long = 1000,    // 1 second
+    maxDelay: Long = 10000,    // 10 seconds
     factor: Double = 2.0,
-    block: suspend () -> T): T
-{
+    block: suspend () -> T
+): T {
     var currentDelay = initialDelay
     repeat(times - 1) {
         try {

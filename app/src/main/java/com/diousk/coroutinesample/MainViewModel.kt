@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
+import com.diousk.coroutinesample.ext.retry
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
@@ -267,8 +268,18 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun retryOnSuspend() {
+        viewModelScope.launch(CoroutineExceptionHandler { coroutineContext, throwable ->
+            Timber.d("handle error $throwable")
+        }) {
+            val value = retry(times = 3) {
+                withContext(Dispatchers.IO) { delay(100); error("an error"); "" }
+            }
+        }
+    }
+
     fun liveDataBuilder() {
-        suspend fun  fetchData(): String = withContext(Dispatchers.Default) {""}
+        suspend fun fetchData(): String = withContext(Dispatchers.Default) { "" }
 
         val liveData = liveData {
             emit(fetchData())
@@ -280,7 +291,7 @@ class MainViewModel : ViewModel() {
     fun simpleChannel() {
         val channel = Channel<Int>()
         viewModelScope.launch {
-            launch(Dispatchers.Default) {
+            launch {
                 (1..5).forEach {
                     delay(100)
                     Timber.d("send on ${Thread.currentThread().name}")
@@ -352,7 +363,27 @@ class MainViewModel : ViewModel() {
 
 
     fun broadcastChannel() {
-
+        val channel = BroadcastChannel<Int>(Channel.CONFLATED)
+        viewModelScope.launch {
+            launch {
+                // note: the consumeEach will suspend until close
+                channel.openSubscription().consumeEach {
+                    println("recv1 $it")
+                }
+                println("recv1 done")
+            }
+            launch {
+                channel.openSubscription().consumeEach {
+                    println("recv2 $it")
+                }
+                println("recv2 done")
+            }
+            launch {
+                (1..10).forEach { delay(100); channel.send(it) }
+                println("send done")
+                channel.close()
+            }
+        }
     }
 
     // --- Flow ---
@@ -366,7 +397,47 @@ class MainViewModel : ViewModel() {
             .launchIn(viewModelScope)
     }
 
-    fun callbackFlow() {
+    fun errorFlow() {
+        val flow = flow {
+            viewModelScope.launch {
+                emit(1)
+            }
+        }
+        viewModelScope.launch {
+            flow.collect { Timber.d("recv: $it") }
+        }
+    }
 
+    fun channelFlow() {
+        // use channelFlow when need to emit item from different coroutines
+        viewModelScope.launch {
+            val flow = channelFlow {
+                launch { send(2) }
+                send(1)
+            }
+            flow.collect { Timber.d("recv: $it") }
+        }
+    }
+
+    fun zipFlows() {
+        viewModelScope.launch {
+            val flow1 = (1..10).asFlow()
+            val flow2 = (11..20).asFlow()
+            flow1.zip(flow2) { i, j -> i + j}
+                .collect { value ->
+                    println("$value")
+                }
+        }
+    }
+
+    fun mergeFlows() {
+        viewModelScope.launch {
+            val flow1 = (1..100).asFlow()
+            val flow2 = (101..200).asFlow()
+            merge(flow1, flow2)
+                .collect { value ->
+                println("$value")
+            }
+        }
     }
 }
