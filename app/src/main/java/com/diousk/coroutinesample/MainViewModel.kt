@@ -26,55 +26,27 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun customScopeWithNormalJobLaunch() {
-        val exceptionHandler = CoroutineExceptionHandler { _, _ -> }
-        val job = Job()
-        val scope = CoroutineScope(Dispatchers.Default + job + exceptionHandler)
-        scope.launch {
-            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
-            delay(400)
-            // this log will not be printed
-            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
-        }
-
-        scope.launch(CoroutineExceptionHandler { coroutineContext, throwable ->
-            Timber.d("child coroutine 2 handle error")
-        }) {
-            Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
-            delay(200)
-            Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
-            try {
-                // throw in scope layer
-                throw Throwable("child 2 throw") // propagate error to its parent
-            } catch (e: Exception) {
+    fun nestedCoroutine() {
+        val job = viewModelScope.launch {
+            Timber.d("child 1 start")
+            launch {
+                Timber.d("nested 1 start")
+                delay(400)
                 // this log will not be printed
-                Timber.d("child 2 catch")
+                Timber.d("nested 1 end")
             }
         }
-    }
-
-    fun customScopeSupervisorJobLaunch() {
-        val job = SupervisorJob()
-        val scope = CoroutineScope(Dispatchers.Default + job)
-        scope.launch {
-            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
-            delay(400)
-            // this log will be printed
-            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
+        viewModelScope.launch {
+            Timber.d("child 2 start")
+            delay(500)
+            Timber.d("child 2 end")
         }
 
-        scope.launch(CoroutineExceptionHandler { _, throwable ->
-            Timber.d("child coroutine 2 handle error")
-        }) {
-            Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
-            delay(200)
-            Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
-            try {
-                // throw in scope layer
-                throw Throwable("child 2 throw") // propagate error to its parent
-            } catch (e: Exception) {
-                Timber.d("child 2 catch")
-            }
+        viewModelScope.launch {
+            Timber.d("child 3 start")
+            delay(100)
+            Timber.d("child 3 end")
+            job.cancel()
         }
     }
 
@@ -102,30 +74,6 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun nestedCoroutine() {
-        val job = viewModelScope.launch {
-            Timber.d("child 1 start")
-            launch {
-                Timber.d("nested 1 start")
-                delay(400)
-                // this log will not be printed
-                Timber.d("nested 1 end")
-            }
-        }
-        viewModelScope.launch {
-            Timber.d("child 2 start")
-            delay(500)
-            Timber.d("child 2 end")
-        }
-
-        viewModelScope.launch {
-            Timber.d("child 3 start")
-            delay(100)
-            Timber.d("child 3 end")
-            job.cancel()
-        }
-    }
-
     fun scopedErrorAsyncCoroutine() {
         suspend fun childCoroutineScope() = coroutineScope {
             val result2 = async { delay(100); error("an error"); return@async 2 }
@@ -146,6 +94,78 @@ class MainViewModel : ViewModel() {
             }
 
             Timber.d("sum of result = ${result1.await() + valueForResult2}")
+        }
+    }
+
+
+    fun customScopeWithNormalJobLaunch() {
+        val exceptionHandler = CoroutineExceptionHandler { _, _ -> }
+        val job = Job()
+        val scope = CoroutineScope(Dispatchers.Default + job + exceptionHandler)
+        scope.launch {
+            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
+            delay(400)
+            // this log will not be printed
+            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
+        }
+
+        scope.launch(CoroutineExceptionHandler { coroutineContext, throwable ->
+            Timber.d("child coroutine 2 handle error")
+        }) {
+            Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
+            delay(200)
+            Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
+            // throw in scope layer
+            throw Exception("child 2 throw") // propagate error to its parent
+        }
+    }
+
+    fun customScopeSupervisorJobLaunch() {
+        val job = SupervisorJob()
+        val scope = CoroutineScope(Dispatchers.Default + job)
+        scope.launch {
+            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
+            delay(400)
+            // this log will be printed
+            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
+        }
+
+        scope.launch(CoroutineExceptionHandler { _, throwable ->
+            Timber.d("child coroutine 2 handle error")
+        }) {
+            Timber.d("child coroutine 2 start on ${Thread.currentThread().name}")
+            delay(200)
+            Timber.d("child coroutine 2 end on ${Thread.currentThread().name}")
+            // throw in scope layer
+            throw Exception("child 2 throw") // propagate error to its parent
+        }
+    }
+
+    fun customScopeSupervisorJobNestedLaunch() {
+        val job = Job()
+        val scope = CoroutineScope(Dispatchers.Default + job)
+        // passing SupervisorJob to launch only works for this scope.launch{},
+        // and does not work for the nested coroutines
+        scope.launch(SupervisorJob() + CoroutineExceptionHandler { _, _ ->  }) {
+            Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
+            launch {
+                Timber.d("child 1-1 launch")
+                delay(500)
+                // this log will not be printed because it will be cancelled
+                Timber.d("child 1-1 done")
+            }
+
+            launch(CoroutineExceptionHandler { _, _ ->
+                // this log will not be printed, propagate error to its parent
+                // use supervisorScope{} if we want to handle error individually, see
+                // supervisorScopeAsyncError() or supervisorScopeLaunchError()
+                Timber.d("child 1-2 handle error")
+            }) {
+                Timber.d("child 1-2 launch with error")
+                delay(100)
+                throw IllegalStateException("child 1-2 throw")
+            }
+            Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
         }
     }
 
@@ -172,7 +192,7 @@ class MainViewModel : ViewModel() {
             }
 
             launch(CoroutineExceptionHandler { _, exception ->
-                // handle error here because this child's failure is not propagated to the parent
+                // handle error here because this child's failure can be handled individually
                 println("Caught $exception")
             }) {
                 delay(100)
@@ -211,9 +231,9 @@ class MainViewModel : ViewModel() {
                 2
             }
             val result2recover = try {
+                // await() will propagate error to its parent
                 result2.await()
-            } catch (e: Exception) { // propagate error to its parent
-                // won't be able to catch here
+            } catch (e: Exception) {
                 0
             }
             result1.await() + result2recover
@@ -227,6 +247,7 @@ class MainViewModel : ViewModel() {
                 2
             }
             val result2recover = try {
+                // it's ok to handle error individually
                 result2.await()
             } catch (e: Exception) {
                 0
@@ -238,7 +259,7 @@ class MainViewModel : ViewModel() {
         val scope = CoroutineScope(Dispatchers.Default + job)
 
         scope.launch(CoroutineExceptionHandler { _, throwable ->
-            Timber.d("parent handle error $throwable")
+            Timber.d("parent handle child error $throwable")
         }) {
             try {
                 Timber.d("1-1 child start")
