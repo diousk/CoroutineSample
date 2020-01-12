@@ -397,8 +397,20 @@ class MainViewModel : ViewModel() {
             .launchIn(viewModelScope)
     }
 
+    fun basicFlow() {
+        val intFlow = flow {
+            (1..10).forEach { emit(it) }
+        }
+        viewModelScope.launch {
+            intFlow.collect {
+                Timber.d("recv: $it")
+            }
+        }
+    }
+
     fun errorFlow() {
         val flow = flow {
+            // error to emit element in another coroutine
             viewModelScope.launch {
                 emit(1)
             }
@@ -409,7 +421,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun channelFlow() {
-        // use channelFlow when need to emit item from different coroutines
+        // use channelFlow when need to emit item from different coroutines (like errorFlow() above)
         viewModelScope.launch {
             val flow = channelFlow {
                 launch { send(2) }
@@ -419,25 +431,35 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun zipFlows() {
-        viewModelScope.launch {
-            val flow1 = (1..10).asFlow()
-            val flow2 = (11..20).asFlow()
-            flow1.zip(flow2) { i, j -> i + j}
-                .collect { value ->
-                    println("$value")
-                }
+    fun switchDispatcherFlow() {
+        flow {
+            Timber.d("emit on thread: ${Thread.currentThread().name}")
+            (1..10).forEach { emit(it) }
         }
+            .flowOn(Dispatchers.IO) // apply dispatcher IO above flowOn
+            .onEach {
+                Timber.d("first onEach $it on thread: ${Thread.currentThread().name}")
+            }
+            .flowOn(newSingleThreadContext("custom-thread")) // apply custom-thread above flowOn
+            .onEach {
+                Timber.d("second onEach $it on thread: ${Thread.currentThread().name}")
+            }
+            .launchIn(viewModelScope)
+    }
+
+    fun zipFlows() {
+        val flow1 = (1..10).asFlow()
+        val flow2 = (11..20).asFlow()
+        flow1.zip(flow2) { i, j -> i + j}
+            .onEach { Timber.d("value : $it") }
+            .launchIn(viewModelScope)
     }
 
     fun mergeFlows() {
-        viewModelScope.launch {
-            val flow1 = (1..100).asFlow()
-            val flow2 = (101..200).asFlow()
-            merge(flow1, flow2)
-                .collect { value ->
-                println("$value")
-            }
-        }
+        val flow1 = (1..100).asFlow()
+        val flow2 = (101..200).asFlow()
+        merge(flow1, flow2)
+            .onEach { Timber.d("value : $it") }
+            .launchIn(viewModelScope)
     }
 }
