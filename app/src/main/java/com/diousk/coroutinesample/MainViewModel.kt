@@ -171,6 +171,13 @@ class MainViewModel : ViewModel() {
             }
             Timber.d("child coroutine 1 end on ${Thread.currentThread().name}")
         }
+
+        scope.launch {
+            Timber.d("another child start")
+            delay(1000)
+            // this log will still be printed because the original coroutine runs on another job
+            Timber.d("another child end")
+        }
     }
 
     fun supervisorScopeAsyncError() {
