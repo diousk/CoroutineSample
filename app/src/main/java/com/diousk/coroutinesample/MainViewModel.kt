@@ -141,12 +141,16 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    // Not recommended
     fun customScopeSupervisorJobNestedLaunch() {
         val job = Job()
         val scope = CoroutineScope(Dispatchers.Default + job)
-        // passing SupervisorJob to launch only works for this scope.launch{},
+        // passing SupervisorJob to launch only works for this "scope.launch{}",
         // and does not work for the nested coroutines
-        scope.launch(SupervisorJob() + CoroutineExceptionHandler { _, _ ->  }) {
+        scope.launch(SupervisorJob() + CoroutineExceptionHandler { _, error ->
+            // this log will be printed, child error is handled here
+            Timber.d("parent handle error $error")
+        }) {
             Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
             launch {
                 Timber.d("child 1-1 launch")
@@ -231,9 +235,11 @@ class MainViewModel : ViewModel() {
                 2
             }
             val result2recover = try {
+                Timber.d("child 1-1 throw")
                 // await() will propagate error to its parent
                 result2.await()
             } catch (e: Exception) {
+                Timber.d("child 1-1 catch")
                 0
             }
             result1.await() + result2recover
