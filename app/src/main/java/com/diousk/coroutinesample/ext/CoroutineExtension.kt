@@ -54,3 +54,9 @@ fun <T> Flow<T>.throttleFist(windowDuration: Long): Flow<T> = flow {
         }
     }
 }
+
+fun Flow<Int>.square(): Flow<Int> = flow {
+    collect {
+        emit(it * it)
+    }
+}

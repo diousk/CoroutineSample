@@ -5,6 +5,7 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
 import com.diousk.coroutinesample.ext.retry
+import com.diousk.coroutinesample.ext.square
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
@@ -493,6 +494,13 @@ class MainViewModel : ViewModel() {
         val flow1 = (1..100).asFlow()
         val flow2 = (101..200).asFlow()
         merge(flow1, flow2)
+            .onEach { Timber.d("value : $it") }
+            .launchIn(viewModelScope)
+    }
+
+    fun squareFlow() {
+        val flow = (1..10).asFlow()
+        flow.square()
             .onEach { Timber.d("value : $it") }
             .launchIn(viewModelScope)
     }
