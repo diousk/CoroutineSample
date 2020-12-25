@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="RightTriangleView">
+        <attr name="color" format="color"/>
+        <attr name="colorStart" format="color"/>
+        <attr name="colorEnd" format="color"/>
+        <attr name="rotate" format="float"/>
+    </declare-styleable>
+</resources>

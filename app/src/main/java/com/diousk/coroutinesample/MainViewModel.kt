@@ -1,18 +1,35 @@
 package com.diousk.coroutinesample
 
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
 import com.diousk.coroutinesample.ext.retry
 import com.diousk.coroutinesample.ext.square
+import io.reactivex.rxjava3.processors.PublishProcessor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.*
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 class MainViewModel : ViewModel() {
+
+    val channel = Channel<Int>().receiveAsFlow().asLiveData()
+
+    val bus = PublishProcessor.create<Int>()
+    private var items: MutableList<Int> = mutableListOf()
+    init {
+//        bus.toObservable()
+//            .concatMap {
+//                Observable.just(it).delay(Random.nextLong(1, 5), TimeUnit.SECONDS)
+//            }
+//            .subscribe { Timber.d("item $it") }
+    }
+
     fun simpleCoroutine() {
         GlobalScope.launch {
             Timber.d("child coroutine 1 start on ${Thread.currentThread().name}")
@@ -60,18 +77,13 @@ class MainViewModel : ViewModel() {
         }
     }
 
+
+
     fun errorAsyncCoroutine() {
-        GlobalScope.launch(Dispatchers.Default) {
-            Timber.d("start async")
-            val result1 = async { delay(400); return@async 1 }
-            val result2 = async { delay(100); error("an error"); return@async 2 }
-            val valueForResult2 = try {
-                result2.await()
-            } catch (e: Exception) {
-                // can not catch here because the error propagate to its parent first
-                100
-            }
-            Timber.d("sum of result = ${result1.await() + valueForResult2}")
+        Timber.d("errorAsyncCoroutine")
+
+        (1..20).onEach {
+            bus.offer(it)
         }
     }
 

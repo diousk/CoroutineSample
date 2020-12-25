@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     tools:context=".MainActivity">
 
     <Button
@@ -11,9 +12,69 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <Button
+        android:id="@+id/button1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hello World2!"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/vip"
+        android:layout_width="200dp"
+        android:layout_height="100dp"
+        android:scaleType="fitXY"
+        android:src="@drawable/vip2"/>
+
+    <RelativeLayout
+        android:id="@+id/vipD"
+        android:layout_width="300dp"
+        android:layout_height="20dp"
+        android:layout_marginTop="40dp"
+        android:background="@drawable/vip_drawable"/>
+
+    <RelativeLayout
+        android:id="@+id/vipS"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_marginTop="40dp" />
+
+    <RelativeLayout
+        android:id="@+id/vipC"
+        android:layout_width="200dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="40dp"
+        android:background="@drawable/test_bg">
+        <ImageView
+            android:id="@+id/vipM"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/layer"/>
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/vipL"
+        android:layout_width="200dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="40dp" >
+    </RelativeLayout>
+
+    <com.diousk.coroutinesample.RightTriangleView
+        android:id="@+id/partHouseParallelogram"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        app:colorStart="@color/colorAccent"
+        app:colorEnd="@color/colorPrimary"
+        app:color="#fff"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+</LinearLayout>

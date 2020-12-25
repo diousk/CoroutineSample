@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <bitmap
+            android:src="@drawable/rep3"
+            android:tileMode="repeat" />
+    </item>
+
+    <item android:top="10dp">
+            <bitmap
+                android:src="@drawable/rep"
+                android:tileModeX="repeat" />
+
+    </item>
+
+    <item android:bottom="10dp">
+            <bitmap
+                android:src="@drawable/rep2"
+                android:tileModeX="repeat" />
+
+    </item>
+</layer-list>
